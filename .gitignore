@@ -1,0 +1,13 @@
+node_modules
+dist
+.vite
+.DS_Store
+*.log
+
+# tsc -b output
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# Reference: cloned upstream Python app for porting; not our code.
+ref/
