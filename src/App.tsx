@@ -11,7 +11,7 @@ import {
 } from './processing/pipeline';
 
 export function App() {
-  const [status, setStatus] = useState('booting worker...');
+  const [status, setStatus] = useState('booting');
   const [meta, setMeta] = useState<{
     decode: DecodeResult;
     metadata: PreviewMetadata;
@@ -26,9 +26,9 @@ export function App() {
     (async () => {
       try {
         await p.ping();
-        setStatus('warming OpenCV...');
+        setStatus('warming opencv');
         await p.warmCv();
-        setStatus('worker ready — pick a RAW file');
+        setStatus('ready');
       } catch (err) {
         setStatus(`worker failed: ${err}`);
       }
@@ -36,7 +36,7 @@ export function App() {
   }, []);
 
   async function handleFile(file: File) {
-    setStatus(`decoding ${file.name}...`);
+    setStatus(`decoding ${file.name}`);
     setMeta(null);
     setLastProcessMs(null);
     setLastCropMs(null);
@@ -45,7 +45,7 @@ export function App() {
       const res = await getProcessor().decode(buf, file.name, params);
       drawPreview(res.width, res.height, res.rgba);
       setMeta({ decode: res, metadata: res.metadata });
-      setStatus(`decoded ${file.name} in ${res.decodeMs.toFixed(0)} ms`);
+      setStatus(`decoded in ${res.decodeMs.toFixed(0)} ms`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatus(`decode failed: ${msg}`);
@@ -53,8 +53,6 @@ export function App() {
     }
   }
 
-  // Re-process on every param change. Slider drags fire one event per step;
-  // process() runs in the worker so the main thread stays responsive.
   useEffect(() => {
     if (!meta) return;
     let cancelled = false;
@@ -90,18 +88,26 @@ export function App() {
     ctx.putImageData(data, 0, 0);
   }
 
+  const frameTag = frameNumberFor(meta?.decode.filename);
+
   return (
-    <div className="app">
-      <header>
+    <div className="sheet">
+      <div className="sprockets" aria-hidden="true" />
+
+      <header className="masthead">
         <h1>Native Film Scan</h1>
-        <p className="status">
-          {status}
-          {lastProcessMs != null && meta && ` · process ${lastProcessMs.toFixed(0)} ms`}
-          {lastCropMs != null && meta && ` · last crop ${lastCropMs.toFixed(0)} ms`}
-        </p>
+        <div className="meta">
+          <span>contact sheet · negative converter</span>
+          <span className="status">
+            {status}
+            {lastProcessMs != null && meta && ` · ${lastProcessMs.toFixed(0)}ms`}
+            {lastCropMs != null && meta && ` · crop ${lastCropMs.toFixed(0)}ms`}
+          </span>
+        </div>
       </header>
 
       <section className="picker">
+        <span>load</span>
         <input
           type="file"
           accept=".dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.tiff,.tif,.jpg,.jpeg,.png"
@@ -112,43 +118,66 @@ export function App() {
         />
       </section>
 
-      <div className="main">
+      <div className="layout">
         <section className="preview">
-          <canvas ref={previewRef} />
-          {meta && (
-            <dl>
-              <dt>file</dt>
-              <dd>{meta.decode.filename}</dd>
-              <dt>camera</dt>
-              <dd>
-                {meta.metadata.cameraMake} {meta.metadata.cameraModel}
-              </dd>
-              <dt>raw size</dt>
-              <dd>
-                {meta.metadata.rawWidth} × {meta.metadata.rawHeight}
-              </dd>
-              <dt>preview</dt>
-              <dd>
-                {meta.decode.width} × {meta.decode.height} (half-size, 16-bit)
-              </dd>
-              <dt>exposure</dt>
-              <dd>
-                ISO {meta.metadata.iso} · 1/
-                {meta.metadata.shutter > 0
-                  ? Math.round(1 / meta.metadata.shutter)
-                  : '?'}
-                s · f/{meta.metadata.aperture} · {meta.metadata.focalLength}mm
-              </dd>
-              <dt>decode</dt>
-              <dd>{meta.decode.decodeMs.toFixed(1)} ms</dd>
-            </dl>
-          )}
+          <div className="frame">
+            {meta && <div className="frame-tag">{frameTag}</div>}
+            <canvas ref={previewRef} />
+          </div>
+          <div className="edge-code">
+            {meta ? (
+              <>
+                <span className="em">{meta.decode.filename}</span>
+                <span>
+                  {meta.metadata.cameraMake} {meta.metadata.cameraModel}
+                </span>
+                <span>
+                  {meta.metadata.iso ? `iso ${meta.metadata.iso} · ` : ''}
+                  {meta.metadata.shutter > 0
+                    ? `1/${Math.round(1 / meta.metadata.shutter)}s · `
+                    : ''}
+                  {meta.metadata.aperture
+                    ? `f/${meta.metadata.aperture} · `
+                    : ''}
+                  {meta.metadata.focalLength
+                    ? `${meta.metadata.focalLength}mm`
+                    : ''}
+                </span>
+                <span>
+                  {meta.decode.width} × {meta.decode.height}
+                </span>
+              </>
+            ) : (
+              <span>no negative loaded</span>
+            )}
+          </div>
         </section>
 
         <ControlPanel params={params} setParams={setParams} disabled={!meta} />
       </div>
+
+      <div className="sprockets" aria-hidden="true" />
+
+      <footer className="colophon">
+        <span>native film scan</span>
+        <span>v0 · contact sheet</span>
+      </footer>
     </div>
   );
+}
+
+// Derive a "frame number" like 23A from the filename. Uses the trailing digits
+// of the basename, padded to 2, then a letter from the first char of the rest.
+// Falls back to "01".
+function frameNumberFor(filename?: string): string {
+  if (!filename) return '01';
+  const base = filename.replace(/\.[^.]+$/, '');
+  const digits = base.match(/(\d+)(?!.*\d)/)?.[1];
+  if (!digits) return base.slice(0, 3).toUpperCase().padEnd(2, '·');
+  const n = digits.slice(-2).padStart(2, '0');
+  // tag the frame with a letter when there are more digits than we showed
+  const letter = digits.length > 2 ? 'A' : '';
+  return `${n}${letter}`;
 }
 
 interface ControlProps {
@@ -159,60 +188,142 @@ interface ControlProps {
 
 const FILM_TYPES: { value: FilmType; label: string }[] = [
   { value: 'colour-negative', label: 'Colour negative' },
-  { value: 'bw-negative', label: 'B&W negative' },
+  { value: 'bw-negative', label: 'Black & white negative' },
   { value: 'slide', label: 'Slide / positive' },
   { value: 'crop-only', label: 'No processing' },
 ];
 
 function ControlPanel({ params, setParams, disabled }: ControlProps) {
-  function patch<K extends keyof ProcessParams>(key: K, value: ProcessParams[K]) {
+  function patch<K extends keyof ProcessParams>(
+    key: K,
+    value: ProcessParams[K],
+  ) {
     setParams({ ...params, [key]: value });
   }
 
   return (
     <aside className="controls" aria-disabled={disabled}>
       <fieldset disabled={disabled}>
-        <label className="row">
-          <span>Film type</span>
-          <select
-            value={params.filmType}
-            onChange={(e) => patch('filmType', e.target.value as FilmType)}
-          >
-            {FILM_TYPES.map((ft) => (
-              <option key={ft.value} value={ft.value}>
-                {ft.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="control-group">
+          <h2>Stock</h2>
+          <div className="row select">
+            <span>film type</span>
+            <select
+              value={params.filmType}
+              onChange={(e) => patch('filmType', e.target.value as FilmType)}
+            >
+              {FILM_TYPES.map((ft) => (
+                <option key={ft.value} value={ft.value}>
+                  {ft.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-        <h4>Auto crop</h4>
-        <label className="row check">
-          <input
-            type="checkbox"
-            checked={params.autoCrop}
-            onChange={(e) => patch('autoCrop', e.target.checked)}
+        <div className="control-group">
+          <h2>Crop</h2>
+          <label className="row check">
+            <input
+              type="checkbox"
+              checked={params.autoCrop}
+              onChange={(e) => patch('autoCrop', e.target.checked)}
+            />
+            <span>detect frame</span>
+          </label>
+          <Slider
+            label="dark"
+            min={0}
+            max={100}
+            value={params.darkThreshold}
+            onChange={(v) => patch('darkThreshold', v)}
           />
-          <span>Detect & crop frame</span>
-        </label>
-        <Slider label="Dark threshold" min={0} max={100} step={1} value={params.darkThreshold} onChange={(v) => patch('darkThreshold', v)} />
-        <Slider label="Light threshold" min={0} max={100} step={1} value={params.lightThreshold} onChange={(v) => patch('lightThreshold', v)} />
-        <Slider label="Border crop %" min={-10} max={50} step={1} value={params.borderCrop} onChange={(v) => patch('borderCrop', v)} />
+          <Slider
+            label="light"
+            min={0}
+            max={100}
+            value={params.lightThreshold}
+            onChange={(v) => patch('lightThreshold', v)}
+          />
+          <Slider
+            label="border"
+            min={-10}
+            max={50}
+            value={params.borderCrop}
+            onChange={(v) => patch('borderCrop', v)}
+          />
+        </div>
 
-        <h4>Tone</h4>
-        <Slider label="Black point" min={-100} max={100} step={1} value={params.blackPoint} onChange={(v) => patch('blackPoint', v)} />
-        <Slider label="White point" min={-100} max={100} step={1} value={params.whitePoint} onChange={(v) => patch('whitePoint', v)} />
-        <Slider label="Exposure (gamma)" min={-100} max={100} step={1} value={params.gamma} onChange={(v) => patch('gamma', v)} />
-        <Slider label="Shadows" min={-100} max={100} step={1} value={params.shadows} onChange={(v) => patch('shadows', v)} />
-        <Slider label="Highlights" min={-100} max={100} step={1} value={params.highlights} onChange={(v) => patch('highlights', v)} />
+        <div className="control-group">
+          <h2>Tone</h2>
+          <Slider
+            label="black"
+            min={-100}
+            max={100}
+            value={params.blackPoint}
+            onChange={(v) => patch('blackPoint', v)}
+          />
+          <Slider
+            label="white"
+            min={-100}
+            max={100}
+            value={params.whitePoint}
+            onChange={(v) => patch('whitePoint', v)}
+          />
+          <Slider
+            label="exposure"
+            min={-100}
+            max={100}
+            value={params.gamma}
+            onChange={(v) => patch('gamma', v)}
+          />
+          <Slider
+            label="shadows"
+            min={-100}
+            max={100}
+            value={params.shadows}
+            onChange={(v) => patch('shadows', v)}
+          />
+          <Slider
+            label="highlights"
+            min={-100}
+            max={100}
+            value={params.highlights}
+            onChange={(v) => patch('highlights', v)}
+          />
+        </div>
 
-        <h4>Colour</h4>
-        <Slider label="Temperature" min={-100} max={100} step={1} value={params.temp} onChange={(v) => patch('temp', v)} />
-        <Slider label="Tint" min={-100} max={100} step={1} value={params.tint} onChange={(v) => patch('tint', v)} />
-        <Slider label="Saturation" min={0} max={200} step={1} value={params.sat} onChange={(v) => patch('sat', v)} />
+        <div className="control-group">
+          <h2>Colour</h2>
+          <Slider
+            label="temperature"
+            min={-100}
+            max={100}
+            value={params.temp}
+            onChange={(v) => patch('temp', v)}
+          />
+          <Slider
+            label="tint"
+            min={-100}
+            max={100}
+            value={params.tint}
+            onChange={(v) => patch('tint', v)}
+          />
+          <Slider
+            label="saturation"
+            min={0}
+            max={200}
+            value={params.sat}
+            onChange={(v) => patch('sat', v)}
+          />
+        </div>
 
-        <button type="button" className="reset" onClick={() => setParams(defaultParams)}>
-          Reset
+        <button
+          type="button"
+          className="reset"
+          onClick={() => setParams(defaultParams)}
+        >
+          Reset settings
         </button>
       </fieldset>
     </aside>
@@ -223,24 +334,25 @@ interface SliderProps {
   label: string;
   min: number;
   max: number;
-  step: number;
   value: number;
   onChange: (v: number) => void;
 }
 
-function Slider({ label, min, max, step, value, onChange }: SliderProps) {
+function Slider({ label, min, max, value, onChange }: SliderProps) {
   return (
-    <label className="row slider">
-      <span>{label}</span>
+    <div className="row slider">
+      <div className="label-row">
+        <span>{label}</span>
+        <output>{value}</output>
+      </div>
       <input
         type="range"
         min={min}
         max={max}
-        step={step}
+        step={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <output>{value}</output>
-    </label>
+    </div>
   );
 }

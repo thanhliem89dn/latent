@@ -1,115 +1,441 @@
+/* Native Film Scan — Contact Sheet design system v1.
+ *
+ * The page is a single sheet of warm paper. The image is the hero, framed
+ * with a frame-number tag and edge-code metadata. The controls live in a
+ * mono rail. Sprocket-hole gutters bookend the sheet at top and bottom.
+ *
+ * Tokens are tuned to print-like contrast: warm ink on bone, no pure black,
+ * no pure white. Stay disciplined — one accent at most, kept in reserve for
+ * future state colour (safelight red on active controls).
+ */
+
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, sans-serif;
+  /* surfaces */
+  --bone: #f4efea;
+  --bone-2: #ebe5dc; /* slightly darker bone — gutters, hairlines */
+  --bone-3: #d8d0c1; /* sprocket holes, dividers */
+  --ink: #1a1815;
+  --ink-2: #4a4640; /* secondary text */
+  --ink-3: #7a766e; /* tertiary text / disabled */
+
+  /* type */
+  --serif: 'Newsreader', 'Cormorant Garamond', Georgia, serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* metric */
+  --rule: 1px;
+  --frame-pad: 1.25rem;
+
+  color-scheme: light;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
   margin: 0;
+  padding: 0;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.app {
+/* sheet — the page container, mimicking a sheet of paper */
+.sheet {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 2.5rem;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
-header h1 {
+/* sprocket gutter — repeated circles across the page top/bottom.
+ * Kept low-contrast: signals "film object" without being decorative jewellery. */
+.sprockets {
+  height: 22px;
+  background-image: radial-gradient(circle at 11px center, var(--bone-3) 4px, transparent 4.5px);
+  background-size: 28px 22px;
+  background-repeat: repeat-x;
+  flex-shrink: 0;
+}
+
+/* header — title in serif, subtitle in mono small caps with horizontal rule */
+.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 2rem 0 1.5rem;
+  border-bottom: var(--rule) solid var(--ink);
+}
+
+.masthead h1 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 2.25rem;
+  line-height: 1.05;
   margin: 0;
-  font-size: 1.4rem;
+  letter-spacing: -0.01em;
 }
 
-.status {
-  margin: 0.25rem 0 0;
-  color: #888;
-  font-size: 0.9rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.masthead .meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
 }
 
-.main {
+.masthead .meta .status {
+  text-align: right;
+}
+
+/* picker — styled as part of the page, not a chrome blob */
+.picker {
+  padding: 1rem 0;
+  border-bottom: var(--rule) solid var(--bone-3);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.picker input[type='file'] {
+  font: inherit;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.picker input[type='file']::file-selector-button {
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--ink);
+  color: var(--bone);
+  border: none;
+  padding: 0.4rem 0.9rem;
+  margin-right: 0.75rem;
+  cursor: pointer;
+}
+
+.picker input[type='file']::file-selector-button:hover {
+  background: var(--ink-2);
+}
+
+/* main grid */
+.layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 1.5rem;
-  align-items: start;
+  gap: 3rem;
+  padding: 2rem 0;
+  flex: 1;
 }
 
-.preview canvas {
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* preview — the framed image, with frame-number tag and edge-code metadata */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.frame {
+  position: relative;
+  background: var(--bone-2);
+  border: var(--rule) solid var(--ink);
+  padding: var(--frame-pad);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
+.frame canvas {
   display: block;
   max-width: 100%;
-  border: 1px solid #444;
+  height: auto;
+  background: var(--bone-2);
 }
 
-dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 1rem;
-  font-size: 0.85rem;
-  margin-top: 0.75rem;
+.frame:empty::after,
+.frame canvas[width='300'][height='150']:not([data-loaded]) {
+  /* placeholder before any decode */
+  content: '';
 }
 
-dt {
-  color: #888;
+/* frame-number tag — sits in the top-left of the frame, like a slate */
+.frame-tag {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  padding: 0.3rem 0.6rem;
+  text-transform: uppercase;
 }
 
-dd {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+/* edge code — the metadata strip below the frame, like the printed edge of a negative */
+.edge-code {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-2);
+  flex-wrap: wrap;
+}
+
+.edge-code span {
+  white-space: nowrap;
+}
+
+.edge-code .em {
+  color: var(--ink);
+}
+
+/* controls rail */
+.controls {
+  font-family: var(--mono);
 }
 
 .controls fieldset {
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
+  border: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.5rem;
 }
 
 .controls fieldset[disabled] {
-  opacity: 0.5;
+  opacity: 0.4;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.control-group h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: var(--rule) solid var(--bone-3);
+  color: var(--ink);
 }
 
 .row {
   display: grid;
-  grid-template-columns: 7.5rem 1fr;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+  gap: 0.75rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
 }
 
 .row.slider {
-  grid-template-columns: 7.5rem 1fr 2.5rem;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.row.slider .label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.row.slider output {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .row.check {
   grid-template-columns: auto 1fr;
 }
 
-.controls h4 {
-  margin: 0.75rem 0 0;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #888;
+.row.select {
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
 }
 
-.row select,
-.row input[type='range'] {
+/* native control styling — thin, minimal, monochrome */
+select,
+input[type='range'],
+input[type='checkbox'] {
+  font: inherit;
+  color: inherit;
+}
+
+select {
+  appearance: none;
+  background: transparent;
+  border: var(--rule) solid var(--ink);
+  color: var(--ink);
+  padding: 0.4rem 0.6rem;
   width: 100%;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) center,
+    calc(100% - 13px) center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 }
 
-.row output {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-align: right;
-  font-size: 0.8rem;
-  color: #888;
+input[type='range'] {
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  height: 18px;
+  cursor: pointer;
 }
 
+input[type='range']::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--ink);
+  border: none;
+}
+
+input[type='range']::-moz-range-track {
+  height: 1px;
+  background: var(--ink);
+  border: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--bone);
+  border: 1px solid var(--ink);
+  margin-top: -6px;
+  cursor: pointer;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--bone);
+  border: 1px solid var(--ink);
+  cursor: pointer;
+}
+
+input[type='range']:focus {
+  outline: none;
+}
+
+input[type='range']:focus::-webkit-slider-thumb {
+  background: var(--ink);
+}
+
+input[type='range']:focus::-moz-range-thumb {
+  background: var(--ink);
+}
+
+input[type='checkbox'] {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--ink);
+  background: var(--bone);
+  cursor: pointer;
+  position: relative;
+  margin: 0;
+}
+
+input[type='checkbox']:checked {
+  background: var(--ink);
+}
+
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: -1px;
+  width: 4px;
+  height: 7px;
+  border: solid var(--bone);
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+
+.row.check span {
+  cursor: pointer;
+}
+
+/* reset link — text-link rather than button, more editorial */
 .reset {
   align-self: flex-start;
-  margin-top: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.85rem;
+  margin-top: 1rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  border-bottom: var(--rule) solid var(--ink-3);
+  padding-bottom: 0.1rem;
+}
+
+.reset:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+/* colophon — bottom credit line, sits below sprockets, like a printed margin */
+.colophon {
+  padding: 1.5rem 0 2rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
 }
