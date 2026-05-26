@@ -34,11 +34,13 @@ jobs:
 
       - run: npm run build
 
+      # Requires a one-time manual setup on the repo:
+      #   Settings → Pages → Source → "GitHub Actions"
+      # `enablement: true` would auto-enable Pages, but creating a Pages site
+      # via the API needs administration:write which the default
+      # GITHUB_TOKEN doesn't get — even with pages:write. Documented at:
+      # https://docs.github.com/en/actions/security-guides/automatic-token-authentication
       - uses: actions/configure-pages@v5
-        with:
-          # Enable Pages automatically if it's not already enabled on the
-          # repo. Avoids the manual one-time Settings → Pages → Source flip.
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
