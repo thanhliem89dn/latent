@@ -44,6 +44,16 @@ export interface ProcessResult {
   cropRect: RotatedRect | null;
 }
 
+export type ExportFormat = 'image/jpeg' | 'image/png';
+
+export interface ExportResult {
+  filename: string;
+  blob: Blob;
+  width: number;
+  height: number;
+  durationMs: number;
+}
+
 let libraw: LibRaw | null = null;
 function getLibRaw(): LibRaw {
   if (!libraw) libraw = new LibRaw();
@@ -71,6 +81,11 @@ interface Cached {
   height: number;
   channels: 1 | 3;
   raw16: Uint16Array;
+  // Original file bytes, retained so exportImage() can re-decode at full
+  // resolution. Required because libraw-wasm transfers (detaches) the input
+  // buffer on open(), and the half-size cached raw16 isn't suitable for export.
+  sourceBytes: Uint8Array;
+  sourceIsRaw: boolean;
 }
 
 let cached: Cached | null = null;
@@ -127,6 +142,8 @@ async function decodeStandardImage(
       height: bitmap.height,
       channels: 3,
       raw16,
+      sourceBytes: new Uint8Array(bytes),
+      sourceIsRaw: false,
     };
 
     return {
@@ -149,6 +166,9 @@ async function decodeRaw(
   bytes: Uint8Array,
   filename: string,
 ): Promise<PreviewMetadata> {
+  // libraw-wasm transfers the input buffer; copy before handing it off.
+  const sourceBytes = new Uint8Array(bytes);
+
   const raw = getLibRaw();
   await raw.open(bytes, {
     halfSize: true,
@@ -181,9 +201,44 @@ async function decodeRaw(
     height: img.height,
     channels: img.colors as 1 | 3,
     raw16: new Uint16Array(raw16),
+    sourceBytes,
+    sourceIsRaw: true,
   };
 
   return compactMeta(meta);
+}
+
+// Decode a RAW at full resolution from the cached source bytes. Used only by
+// exportImage — separate from the preview decoder because we want to keep the
+// half-size preview state intact and we never overwrite `cached`.
+async function decodeRawFullRes(
+  sourceBytes: Uint8Array,
+): Promise<{ raw16: Uint16Array; width: number; height: number; channels: 1 | 3 }> {
+  const bytesForLibraw = new Uint8Array(sourceBytes); // libraw transfers
+  const raw = getLibRaw();
+  await raw.open(bytesForLibraw, {
+    halfSize: false,
+    outputBps: 16,
+    outputColor: 1,
+    useCameraWb: true,
+    noAutoBright: true,
+    userQual: 3,
+  });
+  const img = await raw.imageData();
+  if (img.colors !== 3 && img.colors !== 1) {
+    throw new Error(`unexpected channel count from LibRaw: ${img.colors}`);
+  }
+  const view = new Uint16Array(
+    img.data.buffer,
+    img.data.byteOffset,
+    img.data.byteLength / 2,
+  );
+  return {
+    raw16: new Uint16Array(view),
+    width: img.width,
+    height: img.height,
+    channels: img.colors as 1 | 3,
+  };
 }
 
 function compactMeta(m: Metadata): PreviewMetadata {
@@ -270,6 +325,86 @@ export class Processor {
         },
         [buf],
       );
+    });
+  }
+
+  // Re-decode the original source at full resolution, run the pipeline with
+  // the current params, and encode to an image Blob. Bypasses the preview
+  // crop cache because the cached rect is at half-res percentile thresholds —
+  // findCropRect is cheap to re-run on the full-res data and is more accurate.
+  async exportImage(
+    params: ProcessParams,
+    format: ExportFormat,
+    quality = 92,
+  ): Promise<ExportResult> {
+    return serialize(async () => {
+      if (!cached) throw new Error('no image loaded — call decode() first');
+      const t0 = performance.now();
+
+      let pixels: Uint16Array;
+      let w: number;
+      let h: number;
+      let channels: 1 | 3;
+
+      if (cached.sourceIsRaw) {
+        const full = await decodeRawFullRes(cached.sourceBytes);
+        pixels = full.raw16;
+        w = full.width;
+        h = full.height;
+        channels = full.channels;
+      } else {
+        // Standard images are already at full resolution in the cache.
+        pixels = cached.raw16;
+        w = cached.width;
+        h = cached.height;
+        channels = cached.channels;
+      }
+
+      if (params.autoCrop) {
+        const rect = await findCropRect(
+          pixels,
+          channels,
+          w,
+          h,
+          params.darkThreshold,
+          params.lightThreshold,
+        );
+        if (rect) {
+          const cropped = await applyCrop(
+            pixels,
+            channels,
+            w,
+            h,
+            rect,
+            params.borderCrop,
+          );
+          pixels = cropped.raw16;
+          w = cropped.width;
+          h = cropped.height;
+        }
+      }
+
+      const rgba8 = runPipeline(pixels, channels, w, h, params);
+
+      const canvas = new OffscreenCanvas(w, h);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('OffscreenCanvas 2D context unavailable');
+      const imageData = ctx.createImageData(w, h);
+      imageData.data.set(rgba8);
+      ctx.putImageData(imageData, 0, 0);
+
+      const blob = await canvas.convertToBlob({
+        type: format,
+        quality: format === 'image/jpeg' ? quality / 100 : undefined,
+      });
+
+      return {
+        filename: cached.filename,
+        blob,
+        width: w,
+        height: h,
+        durationMs: performance.now() - t0,
+      };
     });
   }
 }

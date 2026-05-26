@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   getProcessor,
   type DecodeResult,
+  type ExportFormat,
   type PreviewMetadata,
 } from './workers/processorClient';
 import {
@@ -19,6 +20,9 @@ export function App() {
   const [params, setParams] = useState<ProcessParams>(defaultParams);
   const [lastProcessMs, setLastProcessMs] = useState<number | null>(null);
   const [lastCropMs, setLastCropMs] = useState<number | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('image/jpeg');
+  const [exportQuality, setExportQuality] = useState(92);
+  const [exporting, setExporting] = useState(false);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -73,6 +77,39 @@ export function App() {
       cancelled = true;
     };
   }, [params, meta?.decode.filename]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleDownload() {
+    if (!meta || exporting) return;
+    setExporting(true);
+    setStatus('exporting at full resolution...');
+    try {
+      const result = await getProcessor().exportImage(
+        params,
+        exportFormat,
+        exportQuality,
+      );
+      const url = URL.createObjectURL(result.blob);
+      const ext = exportFormat === 'image/jpeg' ? 'jpg' : 'png';
+      const base = result.filename.replace(/\.[^.]+$/, '');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${base}_latent.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      const sizeKb = (result.blob.size / 1024).toFixed(0);
+      setStatus(
+        `exported ${result.width}×${result.height} · ${sizeKb} kB · ${result.durationMs.toFixed(0)} ms`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatus(`export failed: ${msg}`);
+      console.error(err);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function drawPreview(w: number, h: number, rgba: ArrayBufferLike) {
     const canvas = previewRef.current;
@@ -153,7 +190,17 @@ export function App() {
           </div>
         </section>
 
-        <ControlPanel params={params} setParams={setParams} disabled={!meta} />
+        <ControlPanel
+          params={params}
+          setParams={setParams}
+          disabled={!meta}
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          exportQuality={exportQuality}
+          setExportQuality={setExportQuality}
+          exporting={exporting}
+          onDownload={handleDownload}
+        />
       </div>
 
       <div className="sprockets" aria-hidden="true" />
@@ -184,6 +231,12 @@ interface ControlProps {
   params: ProcessParams;
   setParams: (next: ProcessParams) => void;
   disabled: boolean;
+  exportFormat: ExportFormat;
+  setExportFormat: (f: ExportFormat) => void;
+  exportQuality: number;
+  setExportQuality: (q: number) => void;
+  exporting: boolean;
+  onDownload: () => void;
 }
 
 const FILM_TYPES: { value: FilmType; label: string }[] = [
@@ -193,7 +246,17 @@ const FILM_TYPES: { value: FilmType; label: string }[] = [
   { value: 'crop-only', label: 'No processing' },
 ];
 
-function ControlPanel({ params, setParams, disabled }: ControlProps) {
+function ControlPanel({
+  params,
+  setParams,
+  disabled,
+  exportFormat,
+  setExportFormat,
+  exportQuality,
+  setExportQuality,
+  exporting,
+  onDownload,
+}: ControlProps) {
   function patch<K extends keyof ProcessParams>(
     key: K,
     value: ProcessParams[K],
@@ -352,6 +415,45 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             onChange={(v) => patch('sat', v)}
             title="Colour intensity. 0 is monochrome, 100 is unchanged, 200 is double."
           />
+        </div>
+
+        <div className="control-group">
+          <h2>Export</h2>
+          <p className="hint">
+            Re-decodes the original at full resolution and runs the pipeline
+            again, then encodes the finished positive. JPEG is smaller and
+            lossy; PNG is lossless. Big RAW files can take several seconds.
+          </p>
+          <div className="row select">
+            <span>format</span>
+            <select
+              value={exportFormat}
+              onChange={(e) =>
+                setExportFormat(e.target.value as ExportFormat)
+              }
+            >
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/png">PNG</option>
+            </select>
+          </div>
+          {exportFormat === 'image/jpeg' && (
+            <Slider
+              label="quality"
+              min={50}
+              max={100}
+              value={exportQuality}
+              onChange={setExportQuality}
+              title="JPEG quality, 50–100. 92 is a good default for film scans."
+            />
+          )}
+          <button
+            type="button"
+            className="primary"
+            onClick={onDownload}
+            disabled={disabled || exporting}
+          >
+            {exporting ? 'Exporting…' : 'Download'}
+          </button>
         </div>
 
         <button

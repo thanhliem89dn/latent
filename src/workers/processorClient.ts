@@ -13,4 +13,10 @@ export function getProcessor(): Comlink.Remote<Processor> {
   return cached;
 }
 
-export type { DecodeResult, ProcessResult, PreviewMetadata } from './processor.worker';
+export type {
+  DecodeResult,
+  ProcessResult,
+  PreviewMetadata,
+  ExportFormat,
+  ExportResult,
+} from './processor.worker';

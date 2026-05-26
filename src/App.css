@@ -418,6 +418,33 @@ input[type='checkbox']:checked::after {
   cursor: pointer;
 }
 
+/* primary button — filled ink, used for the download action. The only
+ * "loud" element on the sheet; reserved for the page's destination action. */
+.primary {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--bone);
+  border: 1px solid var(--ink);
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: background 120ms ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--ink-2);
+}
+
+.primary:disabled {
+  cursor: not-allowed;
+  background: var(--bone-2);
+  color: var(--ink-3);
+  border-color: var(--bone-3);
+}
+
 /* reset link — text-link rather than button, more editorial */
 .reset {
   align-self: flex-start;
