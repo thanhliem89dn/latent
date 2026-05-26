@@ -95,9 +95,9 @@ export function App() {
       <div className="sprockets" aria-hidden="true" />
 
       <header className="masthead">
-        <h1>Native Film Scan</h1>
+        <h1>Latent</h1>
         <div className="meta">
-          <span>contact sheet · negative converter</span>
+          <span>film negative converter</span>
           <span className="status">
             {status}
             {lastProcessMs != null && meta && ` · ${lastProcessMs.toFixed(0)}ms`}
@@ -159,7 +159,7 @@ export function App() {
       <div className="sprockets" aria-hidden="true" />
 
       <footer className="colophon">
-        <span>native film scan</span>
+        <span>latent</span>
         <span>v0 · contact sheet</span>
       </footer>
     </div>

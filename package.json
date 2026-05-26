@@ -1,5 +1,6 @@
 {
-  "name": "native-film-scan",
+  "name": "latent",
+  "description": "Convert RAW photographs of film negatives into finished positives — entirely in the browser, nothing uploaded.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
