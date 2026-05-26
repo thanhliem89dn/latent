@@ -228,6 +228,9 @@ async function decodeRawFullRes(
   if (img.colors !== 3 && img.colors !== 1) {
     throw new Error(`unexpected channel count from LibRaw: ${img.colors}`);
   }
+  if (img.bits !== 16) {
+    throw new Error(`expected 16-bit decode, got ${img.bits}-bit`);
+  }
   const view = new Uint16Array(
     img.data.buffer,
     img.data.byteOffset,

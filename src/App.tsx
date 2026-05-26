@@ -97,7 +97,9 @@ export function App() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Defer revoke so the download task has a tick to pick up the blob.
+      // Synchronous revoke races with download initiation in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
       const sizeKb = (result.blob.size / 1024).toFixed(0);
       setStatus(
         `exported ${result.width}×${result.height} · ${sizeKb} kB · ${result.durationMs.toFixed(0)} ms`,
@@ -193,7 +195,7 @@ export function App() {
         <ControlPanel
           params={params}
           setParams={setParams}
-          disabled={!meta}
+          disabled={!meta || exporting}
           exportFormat={exportFormat}
           setExportFormat={setExportFormat}
           exportQuality={exportQuality}
