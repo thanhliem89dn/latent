@@ -10,7 +10,10 @@
 /* eslint-disable */
 /* global cv, importScripts, self */
 
-importScripts('/opencv.js');
+// Relative-to-this-worker so it resolves correctly both at the dev-server
+// root ('/opencv.js') and under a GH Pages subpath ('/latent/opencv.js').
+// importScripts() URLs are resolved relative to the worker script's location.
+importScripts('./opencv.js');
 
 let cvReady = false;
 let cvInitError = null;

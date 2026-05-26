@@ -14,7 +14,10 @@ const pending = new Map<
 
 function getWorker(): Worker {
   if (worker) return worker;
-  const w = new Worker('/opencv-worker.js'); // classic, served from public/
+  // Base-aware URL so this works both at the dev-server root ('/') and under
+  // a GH Pages subpath ('/latent/'). Vite injects BASE_URL at build time.
+  const url = `${import.meta.env.BASE_URL}opencv-worker.js`;
+  const w = new Worker(url); // classic, served from public/
   w.onmessage = (e: MessageEvent) => {
     const { id, result, error } = e.data as {
       id: number;
