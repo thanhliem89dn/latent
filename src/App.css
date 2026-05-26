@@ -251,6 +251,19 @@ body {
   color: var(--ink);
 }
 
+/* editorial caption under a section header — sets context without a sidebar
+ * of help text. Italic small serif, muted, hung tight to the heading. */
+.control-group .hint {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin: -0.25rem 0 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .row {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -206,6 +206,11 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
       <fieldset disabled={disabled}>
         <div className="control-group">
           <h2>Stock</h2>
+          <p className="hint">
+            Tell the converter what kind of film it's looking at. Negatives
+            get inverted; slides and positives pass through; “no processing”
+            shows the raw decode untouched.
+          </p>
           <div className="row select">
             <span>film type</span>
             <select
@@ -223,6 +228,13 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
 
         <div className="control-group">
           <h2>Crop</h2>
+          <p className="hint">
+            Find the photo inside the larger scan and straighten it. Raise{' '}
+            <em>dark</em> if the black film holder shows in the crop; lower it
+            if the photo gets clipped. <em>Light</em> excludes bright
+            backlight bleed. <em>Border</em> trims fuzzy mask edges — use a
+            negative value to expand the crop instead.
+          </p>
           <label className="row check">
             <input
               type="checkbox"
@@ -237,6 +249,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.darkThreshold}
             onChange={(v) => patch('darkThreshold', v)}
+            title="Pixels darker than this are treated as 'outside the frame' (e.g. the black film holder)."
           />
           <Slider
             label="light"
@@ -244,6 +257,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.lightThreshold}
             onChange={(v) => patch('lightThreshold', v)}
+            title="Pixels brighter than this are excluded too (e.g. bright backlight bleed). Usually keep at 100."
           />
           <Slider
             label="border"
@@ -251,17 +265,26 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={50}
             value={params.borderCrop}
             onChange={(v) => patch('borderCrop', v)}
+            title="Shrink the detected rectangle inward by N% to trim fuzzy edges. Negative values expand the crop."
           />
         </div>
 
         <div className="control-group">
           <h2>Tone</h2>
+          <p className="hint">
+            <em>Black</em> and <em>white</em> set where the darkest and
+            brightest parts of the image land — the stretch that turns a flat
+            negative into a punchy positive. <em>Exposure</em> shifts overall
+            brightness; <em>shadows</em> and <em>highlights</em> re-shape
+            just the dark or bright ends without touching the rest.
+          </p>
           <Slider
             label="black"
             min={-100}
             max={100}
             value={params.blackPoint}
             onChange={(v) => patch('blackPoint', v)}
+            title="Lift or crush the darkest part of the image. Positive = lifted shadows; negative = deeper blacks."
           />
           <Slider
             label="white"
@@ -269,6 +292,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.whitePoint}
             onChange={(v) => patch('whitePoint', v)}
+            title="Push the brightest part toward pure white. Positive = brighter; negative = compressed highlights."
           />
           <Slider
             label="exposure"
@@ -276,6 +300,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.gamma}
             onChange={(v) => patch('gamma', v)}
+            title="Overall brightness via a gamma curve. Positive brightens midtones; negative darkens them."
           />
           <Slider
             label="shadows"
@@ -283,6 +308,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.shadows}
             onChange={(v) => patch('shadows', v)}
+            title="Recover or deepen the lower midtones. Positive opens up the shadows; negative deepens them."
           />
           <Slider
             label="highlights"
@@ -290,17 +316,25 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.highlights}
             onChange={(v) => patch('highlights', v)}
+            title="Tame or boost the upper midtones. Positive recovers bright detail; negative pushes highlights higher."
           />
         </div>
 
         <div className="control-group">
           <h2>Colour</h2>
+          <p className="hint">
+            <em>Temperature</em> shifts blue↔yellow; <em>tint</em> shifts
+            green↔magenta. Use these to neutralise the orange film-base cast
+            after inversion. <em>Saturation</em> sets overall colour
+            intensity (100 = no change).
+          </p>
           <Slider
             label="temperature"
             min={-100}
             max={100}
             value={params.temp}
             onChange={(v) => patch('temp', v)}
+            title="Blue (cold) ↔ yellow (warm). Positive warms the image; negative cools it."
           />
           <Slider
             label="tint"
@@ -308,6 +342,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={100}
             value={params.tint}
             onChange={(v) => patch('tint', v)}
+            title="Green ↔ magenta. Use to neutralise an unwanted colour cast."
           />
           <Slider
             label="saturation"
@@ -315,6 +350,7 @@ function ControlPanel({ params, setParams, disabled }: ControlProps) {
             max={200}
             value={params.sat}
             onChange={(v) => patch('sat', v)}
+            title="Colour intensity. 0 is monochrome, 100 is unchanged, 200 is double."
           />
         </div>
 
@@ -336,11 +372,12 @@ interface SliderProps {
   max: number;
   value: number;
   onChange: (v: number) => void;
+  title?: string;
 }
 
-function Slider({ label, min, max, value, onChange }: SliderProps) {
+function Slider({ label, min, max, value, onChange, title }: SliderProps) {
   return (
-    <div className="row slider">
+    <div className="row slider" title={title}>
       <div className="label-row">
         <span>{label}</span>
         <output>{value}</output>
@@ -352,6 +389,7 @@ function Slider({ label, min, max, value, onChange }: SliderProps) {
         step={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        title={title}
       />
     </div>
   );
